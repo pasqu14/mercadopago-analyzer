@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MercadoPago Analyzer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .card { @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-6; }
+    .btn-primary { @apply bg-blue-600 text-white px-4 py-2 rounded-xl font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
+    .btn-secondary { @apply bg-gray-100 text-gray-700 px-4 py-2 rounded-xl font-medium hover:bg-gray-200 transition-colors; }
+    .badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
+    .stat-value { @apply text-3xl font-bold text-gray-900; }
+    .stat-label { @apply text-sm text-gray-500 mt-1; }
+    .insight-content h2 { @apply text-lg font-semibold text-gray-900 mb-2 mt-4; }
+    .insight-content p { @apply text-gray-700 mb-3 leading-relaxed; }
+    .insight-content ul { @apply list-disc list-inside space-y-1 text-gray-700 mb-3; }
+    .insight-content strong { @apply font-semibold text-gray-900; }
+    #chat-messages { scrollbar-width: thin; }
+    .spinner { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .pulse { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+    .category-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- Header -->
+<header class="bg-white border-b border-gray-200 sticky top-0 z-40">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-16">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+        </div>
+        <span class="font-semibold text-gray-900">MP Analyzer</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="sync-status" class="text-xs text-gray-400">—</span>
+        <button id="sync-btn" onclick="triggerSync()" class="btn-primary text-sm flex items-center gap-2">
+          <svg id="sync-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Sincronizar
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Main -->
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+  <!-- Month selector -->
+  <div class="flex items-center gap-4">
+    <button onclick="changeMonth(-1)" class="btn-secondary p-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </button>
+    <h1 id="period-title" class="text-xl font-semibold text-gray-900 w-48 text-center">—</h1>
+    <button onclick="changeMonth(1)" class="btn-secondary p-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Stats row -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="card">
+      <div id="stat-total" class="stat-value">$—</div>
+      <div class="stat-label">Gasto total del mes</div>
+    </div>
+    <div class="card">
+      <div id="stat-daily" class="stat-value">$—</div>
+      <div class="stat-label">Promedio diario</div>
+    </div>
+    <div class="card">
+      <div id="stat-count" class="stat-value">—</div>
+      <div class="stat-label">Transacciones</div>
+    </div>
+    <div class="card">
+      <div id="stat-top" class="stat-value text-2xl">—</div>
+      <div class="stat-label">Categoría top</div>
+    </div>
+  </div>
+
+  <!-- Charts row -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="card">
+      <h2 class="text-base font-semibold text-gray-900 mb-4">Gasto por categoría</h2>
+      <div class="relative h-64">
+        <canvas id="pie-chart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="text-base font-semibold text-gray-900 mb-4">Tendencia (últimos 90 días)</h2>
+      <div class="relative h-64">
+        <canvas id="line-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Insight + Chat -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- AI Card -->
+    <div class="card flex flex-col gap-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center">
+            <svg class="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.347.347A3.99 3.99 0 0115 18H9a3.99 3.99 0 01-2.828-1.172l-.347-.347z"/>
+            </svg>
+          </div>
+          <span class="font-semibold text-gray-900 text-sm">Análisis IA</span>
+        </div>
+        <button onclick="generateInsight()" class="btn-primary text-xs px-3 py-1.5" id="analyze-btn">
+          Generar análisis
+        </button>
+      </div>
+      <div id="insight-container" class="flex-1 min-h-32">
+        <div id="insight-placeholder" class="flex flex-col items-center justify-center h-32 text-gray-400 gap-2">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+          </svg>
+          <span class="text-sm">Hacé click en "Generar análisis" para obtener insights de IA</span>
+        </div>
+        <div id="insight-text" class="insight-content hidden prose prose-sm max-w-none"></div>
+        <div id="insight-loading" class="hidden flex items-center gap-3 h-32 justify-center">
+          <svg class="spinner w-6 h-6 text-purple-500" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          <span class="text-sm text-gray-500">Consultando IA...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat -->
+    <div class="card flex flex-col gap-3 h-96">
+      <div class="flex items-center gap-2">
+        <div class="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+          <svg class="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+          </svg>
+        </div>
+        <span class="font-semibold text-gray-900 text-sm">Chat con IA</span>
+      </div>
+      <div id="chat-messages" class="flex-1 overflow-y-auto space-y-3 pr-1">
+        <div class="flex gap-2">
+          <div class="w-6 h-6 bg-purple-100 rounded-full flex-shrink-0 flex items-center justify-center text-xs">🤖</div>
+          <div class="bg-gray-100 rounded-2xl rounded-tl-none px-3 py-2 text-sm text-gray-700 max-w-xs">
+            ¡Hola! Preguntame sobre tus gastos. Por ejemplo: "¿Dónde gasté más este mes?"
+          </div>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <input
+          id="chat-input"
+          type="text"
+          placeholder="Preguntá sobre tus gastos..."
+          class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          onkeydown="if(event.key==='Enter') sendChat()"
+        />
+        <button onclick="sendChat()" class="btn-primary text-sm px-3 py-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transactions table -->
+  <div class="card">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-base font-semibold text-gray-900">Transacciones</h2>
+      <div class="flex gap-2">
+        <select id="filter-category" onchange="loadMonthData()" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">Todas las categorías</option>
+          <option>Alimentación</option>
+          <option>Transporte</option>
+          <option>Entretenimiento</option>
+          <option>Servicios</option>
+          <option>Suscripciones</option>
+          <option>Salud</option>
+          <option>Ropa</option>
+          <option>Otros</option>
+        </select>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-100">
+            <th class="text-left py-2 px-3 text-gray-500 font-medium">Fecha</th>
+            <th class="text-left py-2 px-3 text-gray-500 font-medium">Comercio</th>
+            <th class="text-left py-2 px-3 text-gray-500 font-medium">Categoría</th>
+            <th class="text-left py-2 px-3 text-gray-500 font-medium">Método</th>
+            <th class="text-left py-2 px-3 text-gray-500 font-medium">Cuotas</th>
+            <th class="text-right py-2 px-3 text-gray-500 font-medium">Monto</th>
+          </tr>
+        </thead>
+        <tbody id="payments-table" class="divide-y divide-gray-50">
+          <tr><td colspan="6" class="text-center py-8 text-gray-400">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="pagination" class="flex items-center justify-between mt-4 text-sm text-gray-500"></div>
+  </div>
+
+</main>
+
+<script>
+// ── State ──────────────────────────────────────────────
+const state = {
+  year: new Date().getFullYear(),
+  month: new Date().getMonth() + 1,
+  page: 1,
+  pieChart: null,
+  lineChart: null,
+};
+
+const CATEGORY_COLORS = {
+  'Alimentación': '#3b82f6',
+  'Transporte': '#f59e0b',
+  'Entretenimiento': '#8b5cf6',
+  'Servicios': '#10b981',
+  'Suscripciones': '#ec4899',
+  'Salud': '#ef4444',
+  'Ropa': '#f97316',
+  'Otros': '#94a3b8',
+};
+
+// ── Helpers ────────────────────────────────────────────
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n);
+const fmtDate = (d) => new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function showToast(msg, type = 'success') {
+  const t = document.createElement('div');
+  t.className = `fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl text-white text-sm font-medium shadow-lg ${type === 'error' ? 'bg-red-500' : 'bg-green-500'}`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ── Month navigation ───────────────────────────────────
+function changeMonth(delta) {
+  state.month += delta;
+  if (state.month > 12) { state.month = 1; state.year++; }
+  if (state.month < 1)  { state.month = 12; state.year--; }
+  state.page = 1;
+  loadMonthData();
+}
+
+function updatePeriodTitle() {
+  document.getElementById('period-title').textContent = `${MONTHS[state.month - 1]} ${state.year}`;
+}
+
+// ── Data loading ───────────────────────────────────────
+async function loadMonthData() {
+  updatePeriodTitle();
+
+  const [monthly, trends] = await Promise.all([
+    fetch(`/api/expenses/monthly/${state.year}/${state.month}`).then(r => r.json()),
+    fetch('/api/trends?days=90').then(r => r.json()),
+  ]);
+
+  updateStats(monthly);
+  updatePieChart(monthly.categories);
+  updateLineChart(trends.daily);
+  await loadTransactions();
+}
+
+async function loadTransactions() {
+  const category = document.getElementById('filter-category').value;
+  const params = new URLSearchParams({
+    page: state.page,
+    limit: 15,
+    year: state.year,
+    month: state.month,
+    ...(category ? { category } : {}),
+  });
+
+  const data = await fetch(`/api/expenses?${params}`).then(r => r.json());
+  renderTable(data.data);
+  renderPagination(data.pagination);
+}
+
+// ── Stats ──────────────────────────────────────────────
+function updateStats(monthly) {
+  document.getElementById('stat-total').textContent = fmt(monthly.totalSpend);
+  document.getElementById('stat-daily').textContent = fmt(monthly.dailyAverage);
+  document.getElementById('stat-count').textContent = monthly.transactionCount;
+  document.getElementById('stat-top').textContent = monthly.topCategory ?? '—';
+}
+
+// ── Charts ─────────────────────────────────────────────
+function updatePieChart(categories) {
+  const ctx = document.getElementById('pie-chart').getContext('2d');
+  if (state.pieChart) state.pieChart.destroy();
+
+  if (!categories.length) return;
+
+  state.pieChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: categories.map(c => c.name),
+      datasets: [{
+        data: categories.map(c => c.amount),
+        backgroundColor: categories.map(c => CATEGORY_COLORS[c.name] || '#94a3b8'),
+        borderWidth: 2,
+        borderColor: '#fff',
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { font: { size: 11 }, padding: 12 } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ` ${ctx.label}: ${fmt(ctx.raw)} (${ctx.parsed.toFixed(1) ?? ctx.raw}%)`,
+          },
+        },
+      },
+    },
+  });
+}
+
+function updateLineChart(daily) {
+  const ctx = document.getElementById('line-chart').getContext('2d');
+  if (state.lineChart) state.lineChart.destroy();
+  if (!daily || !daily.length) return;
+
+  // Rolling 7-day average
+  const amounts = daily.map(d => d.amount);
+  const rolling = amounts.map((_, i) => {
+    const slice = amounts.slice(Math.max(0, i - 6), i + 1);
+    return slice.reduce((a, b) => a + b, 0) / slice.length;
+  });
+
+  state.lineChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: daily.map(d => {
+        const dt = new Date(d.date);
+        return `${dt.getDate()}/${dt.getMonth() + 1}`;
+      }),
+      datasets: [
+        {
+          label: 'Gasto diario',
+          data: amounts,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,0.08)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 2,
+        },
+        {
+          label: 'Media 7 días',
+          data: rolling,
+          borderColor: '#f59e0b',
+          borderDash: [5, 5],
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      scales: {
+        y: {
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          ticks: { callback: v => '$' + (v/1000).toFixed(0) + 'k', font: { size: 10 } },
+        },
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
+      },
+      plugins: {
+        legend: { labels: { font: { size: 11 }, padding: 12 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.raw)}` } },
+      },
+    },
+  });
+}
+
+// ── Table ──────────────────────────────────────────────
+function renderTable(payments) {
+  const tbody = document.getElementById('payments-table');
+  if (!payments.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">Sin transacciones para este período</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = payments.map(p => {
+    const color = CATEGORY_COLORS[p.category?.name] || '#94a3b8';
+    const catName = p.category?.name || 'Otros';
+    const method = p.paymentMethod?.replace('_', ' ') || '—';
+    return `
+      <tr class="hover:bg-gray-50 transition-colors">
+        <td class="py-3 px-3 text-gray-500">${fmtDate(p.date)}</td>
+        <td class="py-3 px-3 font-medium text-gray-900">${p.merchantName || p.description || '—'}</td>
+        <td class="py-3 px-3">
+          <select onchange="updateCategory('${p.id}', this.value)" class="text-xs border-0 bg-transparent focus:outline-none cursor-pointer" style="color:${color}">
+            ${['Alimentación','Transporte','Entretenimiento','Servicios','Suscripciones','Salud','Ropa','Otros'].map(c =>
+              `<option value="${c}" ${c === catName ? 'selected' : ''}>${c}</option>`
+            ).join('')}
+          </select>
+        </td>
+        <td class="py-3 px-3 text-gray-500 capitalize">${method}</td>
+        <td class="py-3 px-3 text-gray-500">${p.installments > 1 ? p.installments + 'x' : '—'}</td>
+        <td class="py-3 px-3 text-right font-semibold text-gray-900">${fmt(p.amount)}</td>
+      </tr>`;
+  }).join('');
+}
+
+function renderPagination({ page, pages, total }) {
+  const el = document.getElementById('pagination');
+  if (pages <= 1) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <span>${total} transacciones</span>
+    <div class="flex gap-2">
+      <button onclick="changePage(${page - 1})" ${page <= 1 ? 'disabled' : ''} class="btn-secondary px-3 py-1 text-xs disabled:opacity-40">←</button>
+      <span class="px-2 py-1">Pág ${page} / ${pages}</span>
+      <button onclick="changePage(${page + 1})" ${page >= pages ? 'disabled' : ''} class="btn-secondary px-3 py-1 text-xs disabled:opacity-40">→</button>
+    </div>`;
+}
+
+function changePage(p) {
+  state.page = p;
+  loadTransactions();
+}
+
+async function updateCategory(paymentId, category) {
+  try {
+    await fetch(`/api/payments/${paymentId}/category`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category }),
+    });
+    showToast(`Categoría actualizada: ${category}`);
+    setTimeout(() => loadMonthData(), 500);
+  } catch {
+    showToast('Error al actualizar categoría', 'error');
+  }
+}
+
+// ── Sync ───────────────────────────────────────────────
+async function triggerSync() {
+  const btn = document.getElementById('sync-btn');
+  const icon = document.getElementById('sync-icon');
+  btn.disabled = true;
+  icon.classList.add('spinner');
+
+  try {
+    const res = await fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast(`Sync ok: ${data.synced} nuevos, ${data.skipped} ya existían`);
+    loadMonthData();
+    updateSyncStatus();
+  } catch (e) {
+    showToast(e.message || 'Error de sincronización', 'error');
+  } finally {
+    btn.disabled = false;
+    icon.classList.remove('spinner');
+  }
+}
+
+async function updateSyncStatus() {
+  try {
+    const { lastSync } = await fetch('/api/sync/status').then(r => r.json());
+    if (!lastSync) return;
+    const mins = Math.round((Date.now() - new Date(lastSync.finishedAt || lastSync.createdAt).getTime()) / 60000);
+    const el = document.getElementById('sync-status');
+    if (mins < 60) el.textContent = `Sync hace ${mins} min`;
+    else el.textContent = `Sync hace ${Math.round(mins/60)}h`;
+  } catch {}
+}
+
+// ── AI Insight ─────────────────────────────────────────
+async function generateInsight() {
+  const btn = document.getElementById('analyze-btn');
+  const placeholder = document.getElementById('insight-placeholder');
+  const text = document.getElementById('insight-text');
+  const loading = document.getElementById('insight-loading');
+
+  btn.disabled = true;
+  placeholder.classList.add('hidden');
+  text.classList.add('hidden');
+  loading.classList.remove('hidden');
+
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: '¿Cómo me fue este mes? Dame un resumen ejecutivo, anomalías detectadas y recomendaciones.',
+        period: { year: state.year, month: state.month },
+      }),
+    });
+    const data = await res.json();
+    text.innerHTML = marked.parse(data.insight || 'Sin insight disponible.');
+    text.classList.remove('hidden');
+  } catch {
+    text.innerHTML = '<p class="text-red-500">Error al generar análisis.</p>';
+    text.classList.remove('hidden');
+  } finally {
+    loading.classList.add('hidden');
+    btn.disabled = false;
+  }
+}
+
+// ── Chat ───────────────────────────────────────────────
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const question = input.value.trim();
+  if (!question) return;
+
+  const messages = document.getElementById('chat-messages');
+
+  // User bubble
+  messages.innerHTML += `
+    <div class="flex gap-2 justify-end">
+      <div class="bg-blue-600 rounded-2xl rounded-tr-none px-3 py-2 text-sm text-white max-w-xs">${question}</div>
+      <div class="w-6 h-6 bg-blue-100 rounded-full flex-shrink-0 flex items-center justify-center text-xs">👤</div>
+    </div>`;
+
+  input.value = '';
+
+  // Loading bubble
+  const loadId = 'chat-load-' + Date.now();
+  messages.innerHTML += `
+    <div id="${loadId}" class="flex gap-2">
+      <div class="w-6 h-6 bg-purple-100 rounded-full flex-shrink-0 flex items-center justify-center text-xs">🤖</div>
+      <div class="bg-gray-100 rounded-2xl rounded-tl-none px-3 py-2 text-sm text-gray-500 pulse">Pensando...</div>
+    </div>`;
+  messages.scrollTop = messages.scrollHeight;
+
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question,
+        period: { year: state.year, month: state.month },
+      }),
+    });
+    const data = await res.json();
+
+    document.getElementById(loadId).outerHTML = `
+      <div class="flex gap-2">
+        <div class="w-6 h-6 bg-purple-100 rounded-full flex-shrink-0 flex items-center justify-center text-xs">🤖</div>
+        <div class="bg-gray-100 rounded-2xl rounded-tl-none px-3 py-2 text-sm text-gray-700 max-w-xs insight-content">${marked.parse(data.insight || '—')}</div>
+      </div>`;
+  } catch {
+    document.getElementById(loadId).outerHTML = `
+      <div class="flex gap-2">
+        <div class="w-6 h-6 bg-red-100 rounded-full flex-shrink-0 text-xs flex items-center justify-center">⚠️</div>
+        <div class="bg-red-50 rounded-2xl px-3 py-2 text-sm text-red-600 max-w-xs">Error al obtener respuesta.</div>
+      </div>`;
+  }
+
+  messages.scrollTop = messages.scrollHeight;
+}
+
+// ── Init ───────────────────────────────────────────────
+loadMonthData();
+updateSyncStatus();
+setInterval(updateSyncStatus, 60000);
+</script>
+</body>
+</html>

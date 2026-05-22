@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  mpId          String   @unique @map("mp_id")
+  amount        Float
+  netAmount     Float?   @map("net_amount")
+  currency      String   @default("ARS")
+  date          DateTime
+  merchantName  String?  @map("merchant_name")
+  description   String?
+  status        String
+  paymentMethod String?  @map("payment_method")
+  paymentType   String?  @map("payment_type")
+  installments  Int      @default(1)
+  rawData       Json?    @map("raw_data")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  category      Category?
+
+  @@map("payments")
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  paymentId String   @unique @map("payment_id")
+  name      String
+  isManual  Boolean  @default(false) @map("is_manual")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@map("categories")
+}
+
+model AnalyticsCache {
+  id               String   @id @default(cuid())
+  period           String   @unique
+  totalSpend       Float    @map("total_spend")
+  dailyAverage     Float    @map("daily_average")
+  topCategory      String?  @map("top_category")
+  trend            Float?
+  transactionCount Int      @map("transaction_count")
+  aiInsight        String?  @map("ai_insight") @db.Text
+  aiInsightAt      DateTime? @map("ai_insight_at")
+  metadata         Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("analytics_cache")
+}
+
+model SyncLog {
+  id          String   @id @default(cuid())
+  startedAt   DateTime @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+  status      String
+  newPayments Int      @default(0) @map("new_payments")
+  error       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("sync_logs")
+}

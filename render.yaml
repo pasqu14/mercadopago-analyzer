@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: mercadopago-analysis
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build && npx prisma migrate deploy
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: MP_ACCESS_TOKEN
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: API_SECRET
+        generateValue: true
+      - key: PORT
+        value: 3000
+
+  - type: cron
+    name: mercadopago-sync
+    env: node
+    region: oregon
+    schedule: "0 0,6,12,18 * * *"
+    buildCommand: npm install && npm run build
+    startCommand: node dist/cron/run-sync.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: MP_ACCESS_TOKEN
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

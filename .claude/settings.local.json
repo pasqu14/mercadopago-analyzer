@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npm test *)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Usuario\\\\.claude\\\\projects\\\\C--Users-Usuario-Documents-CLAUDE-Projects-PERSONAL-MERCADO-PAGO\\\\memory\")"
+    ]
+  }
+}
