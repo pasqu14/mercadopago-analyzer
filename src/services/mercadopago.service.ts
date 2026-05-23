@@ -73,9 +73,11 @@ export class MercadoPagoService {
       limit: this.PAGE_SIZE,
     };
 
-    if (dateFrom) params['range'] = 'date_created';
-    if (dateFrom) params['begin_date'] = dateFrom.toISOString();
-    if (dateTo) params['end_date'] = dateTo.toISOString();
+    if (dateFrom) {
+      params['range'] = 'date_created';
+      params['begin_date'] = dateFrom.toISOString();
+      params['end_date'] = (dateTo ?? new Date()).toISOString();
+    }
 
     while (hasMore) {
       try {
