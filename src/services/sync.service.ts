@@ -45,6 +45,12 @@ export class SyncService {
           const existing = await prisma.payment.findUnique({ where: { mpId } });
 
           if (existing) {
+            if (currentUserId !== null) {
+              const isIncome = mpPayment.payer.id !== currentUserId;
+              if (existing.isIncome !== isIncome) {
+                await prisma.payment.update({ where: { id: existing.id }, data: { isIncome } });
+              }
+            }
             skipped++;
             continue;
           }
