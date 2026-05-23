@@ -10,6 +10,7 @@ const envSchema = z.object({
   MP_ACCESS_TOKEN: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
+  GROQ_API_KEY: z.string().optional(),
   API_SECRET: z.string().optional(),
 });
 

@@ -58,7 +58,15 @@ PREGUNTA DEL USUARIO: ${question}`;
       try {
         return await this.callClaude(systemPrompt, contextMessage);
       } catch (err) {
-        logger.warn({ err }, 'Claude falló, intentando fallback a Gemini');
+        logger.warn({ err }, 'Claude falló, intentando fallback a Groq');
+      }
+    }
+
+    if (env.GROQ_API_KEY) {
+      try {
+        return await this.callGroq(systemPrompt, contextMessage);
+      } catch (err) {
+        logger.warn({ err }, 'Groq falló, intentando Gemini');
       }
     }
 
@@ -86,6 +94,27 @@ PREGUNTA DEL USUARIO: ${question}`;
     const content = response.content[0];
     if (content.type !== 'text') throw new Error('Unexpected response type');
     return content.text;
+  }
+
+  private async callGroq(system: string, message: string): Promise<string> {
+    const response = await axios.post(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: message },
+        ],
+        max_tokens: 1024,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${env.GROQ_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    return response.data.choices[0].message.content as string;
   }
 
   private async callGemini(system: string, message: string): Promise<string> {
