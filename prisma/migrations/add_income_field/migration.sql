@@ -1,0 +1,1 @@
+ALTER TABLE "payments" ADD COLUMN "is_income" BOOLEAN NOT NULL DEFAULT false;

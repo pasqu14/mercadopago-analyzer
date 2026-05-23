@@ -32,12 +32,12 @@ export class SyncService {
       const days = options.full ? 365 : (options.days ?? 30);
       logger.info({ days }, 'Starting MP sync');
 
-      const payments = await withRetry(
-        () => this.mpService.getRecentPayments(days),
-        { maxAttempts: 3, label: 'MP fetch' }
-      );
+      const [payments, currentUserId] = await Promise.all([
+        withRetry(() => this.mpService.getRecentPayments(days), { maxAttempts: 3, label: 'MP fetch' }),
+        this.mpService.getCurrentUserId(),
+      ]);
 
-      logger.info({ count: payments.length }, 'Payments fetched from MP');
+      logger.info({ count: payments.length, currentUserId }, 'Payments fetched from MP');
 
       for (const mpPayment of payments) {
         try {
@@ -58,6 +58,11 @@ export class SyncService {
           const merchantName = description ?? mpPayment.payment_method_id;
           const categoryName = categorize(merchantName ?? '');
 
+          // income = someone paid us (we are the collector, not the payer)
+          const isIncome = currentUserId !== null
+            ? mpPayment.payer.id !== currentUserId
+            : false;
+
           const payment = await prisma.payment.create({
             data: {
               mpId,
@@ -71,6 +76,7 @@ export class SyncService {
               paymentMethod: mpPayment.payment_method_id,
               paymentType: mpPayment.payment_type_id,
               installments: mpPayment.installments,
+              isIncome,
               rawData: mpPayment as object,
             },
           });

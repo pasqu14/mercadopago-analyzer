@@ -13,6 +13,8 @@ export interface MonthlySummary {
   year: number;
   month: number;
   totalSpend: number;
+  totalIncome: number;
+  balance: number;
   dailyAverage: number;
   transactionCount: number;
   categories: CategoryBreakdown[];
@@ -28,6 +30,7 @@ export interface MonthlySummary {
     paymentMethod: string | null;
     installments: number;
     category: string | null;
+    isIncome: boolean;
   }>;
 }
 
@@ -56,11 +59,16 @@ export class AnalyticsService {
       orderBy: { date: 'desc' },
     });
 
-    const totalSpend = payments.reduce((sum, p) => sum + p.amount, 0);
+    const expenses = payments.filter((p) => !p.isIncome);
+    const income = payments.filter((p) => p.isIncome);
+
+    const totalSpend = expenses.reduce((sum, p) => sum + p.amount, 0);
+    const totalIncome = income.reduce((sum, p) => sum + p.amount, 0);
+    const balance = totalIncome - totalSpend;
     const dailyAverage = totalSpend / daysInMonth;
 
     const categoryMap = new Map<string, { amount: number; count: number }>();
-    for (const payment of payments) {
+    for (const payment of expenses) {
       const name = payment.category?.name ?? 'Otros';
       const current = categoryMap.get(name) ?? { amount: 0, count: 0 };
       categoryMap.set(name, {
@@ -88,14 +96,14 @@ export class AnalyticsService {
         dailyAverage,
         topCategory,
         transactionCount: payments.length,
-        metadata: JSON.parse(JSON.stringify({ categories })),
+        metadata: JSON.parse(JSON.stringify({ categories, totalIncome, balance })),
       },
       update: {
         totalSpend,
         dailyAverage,
         topCategory,
         transactionCount: payments.length,
-        metadata: JSON.parse(JSON.stringify({ categories })),
+        metadata: JSON.parse(JSON.stringify({ categories, totalIncome, balance })),
       },
     });
 
@@ -104,6 +112,8 @@ export class AnalyticsService {
       year,
       month,
       totalSpend,
+      totalIncome,
+      balance,
       dailyAverage,
       transactionCount: payments.length,
       categories,
@@ -119,6 +129,7 @@ export class AnalyticsService {
         paymentMethod: p.paymentMethod,
         installments: p.installments,
         category: p.category?.name ?? null,
+        isIncome: p.isIncome,
       })),
     };
   }

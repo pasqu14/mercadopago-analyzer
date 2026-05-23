@@ -74,14 +74,22 @@
   </div>
 
   <!-- Stats row -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+  <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
     <div class="card">
-      <div id="stat-total" class="stat-value">$—</div>
-      <div class="stat-label">Gasto total del mes</div>
+      <div id="stat-total" class="stat-value text-red-600">$—</div>
+      <div class="stat-label">Gastos del mes</div>
+    </div>
+    <div class="card">
+      <div id="stat-income" class="stat-value text-green-600">$—</div>
+      <div class="stat-label">Ingresos del mes</div>
+    </div>
+    <div class="card">
+      <div id="stat-balance" class="stat-value">$—</div>
+      <div class="stat-label">Balance</div>
     </div>
     <div class="card">
       <div id="stat-daily" class="stat-value">$—</div>
-      <div class="stat-label">Promedio diario</div>
+      <div class="stat-label">Promedio diario (gastos)</div>
     </div>
     <div class="card">
       <div id="stat-count" class="stat-value">—</div>
@@ -185,6 +193,11 @@
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-base font-semibold text-gray-900">Transacciones</h2>
       <div class="flex gap-2">
+        <select id="filter-type" onchange="onTypeFilter()" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="all">Todos</option>
+          <option value="expense">Solo gastos</option>
+          <option value="income">Solo ingresos</option>
+        </select>
         <select id="filter-category" onchange="loadMonthData()" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">Todas las categorías</option>
           <option>Alimentación</option>
@@ -230,6 +243,7 @@ const state = {
   page: 1,
   sortBy: 'date',
   sortOrder: 'desc',
+  typeFilter: 'all',
   pieChart: null,
   lineChart: null,
 };
@@ -288,6 +302,12 @@ async function loadMonthData() {
   await loadTransactions();
 }
 
+function onTypeFilter() {
+  state.typeFilter = document.getElementById('filter-type').value;
+  state.page = 1;
+  loadTransactions();
+}
+
 async function loadTransactions() {
   const category = document.getElementById('filter-category').value;
   const params = new URLSearchParams({
@@ -297,6 +317,7 @@ async function loadTransactions() {
     month: state.month,
     sortBy: state.sortBy,
     sortOrder: state.sortOrder,
+    type: state.typeFilter,
     ...(category ? { category } : {}),
   });
 
@@ -330,6 +351,11 @@ function updateSortHeaders() {
 // ── Stats ──────────────────────────────────────────────
 function updateStats(monthly) {
   document.getElementById('stat-total').textContent = fmt(monthly.totalSpend);
+  document.getElementById('stat-income').textContent = fmt(monthly.totalIncome ?? 0);
+  const balance = monthly.balance ?? 0;
+  const balanceEl = document.getElementById('stat-balance');
+  balanceEl.textContent = fmt(balance);
+  balanceEl.className = 'stat-value ' + (balance >= 0 ? 'text-green-600' : 'text-red-600');
   document.getElementById('stat-daily').textContent = fmt(monthly.dailyAverage);
   document.getElementById('stat-count').textContent = monthly.transactionCount;
   document.getElementById('stat-top').textContent = monthly.topCategory ?? '—';
@@ -441,10 +467,17 @@ function renderTable(payments) {
     const color = CATEGORY_COLORS[p.category?.name] || '#94a3b8';
     const catName = p.category?.name || 'Otros';
     const method = p.paymentMethod?.replace('_', ' ') || '—';
+    const isIncome = p.isIncome;
+    const rowBg = isIncome ? 'hover:bg-green-50' : 'hover:bg-gray-50';
+    const amountClass = isIncome ? 'text-green-600' : 'text-gray-900';
+    const amountPrefix = isIncome ? '+' : '';
+    const incomeBadge = isIncome
+      ? `<span class="ml-2 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">Ingreso</span>`
+      : '';
     return `
-      <tr class="hover:bg-gray-50 transition-colors">
+      <tr class="${rowBg} transition-colors">
         <td class="py-3 px-3 text-gray-500">${fmtDate(p.date)}</td>
-        <td class="py-3 px-3 font-medium text-gray-900">${p.merchantName || p.description || '—'}</td>
+        <td class="py-3 px-3 font-medium text-gray-900">${p.merchantName || p.description || '—'}${incomeBadge}</td>
         <td class="py-3 px-3">
           <select onchange="updateCategory('${p.id}', this.value)" class="text-xs border-0 bg-transparent focus:outline-none cursor-pointer" style="color:${color}">
             ${['Alimentación','Transporte','Entretenimiento','Servicios','Suscripciones','Salud','Ropa','Transferencias','Cuotas','Otros'].map(c =>
@@ -454,7 +487,7 @@ function renderTable(payments) {
         </td>
         <td class="py-3 px-3 text-gray-500 capitalize">${method}</td>
         <td class="py-3 px-3 text-gray-500">${p.installments > 1 ? p.installments + 'x' : '—'}</td>
-        <td class="py-3 px-3 text-right font-semibold text-gray-900">${fmt(p.amount)}</td>
+        <td class="py-3 px-3 text-right font-semibold ${amountClass}">${amountPrefix}${fmt(p.amount)}</td>
       </tr>`;
   }).join('');
 }

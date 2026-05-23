@@ -11,6 +11,7 @@ export interface MPPayment {
   money_release_date: string | null;
   payment_method_id: string;
   payment_type_id: string;
+  operation_type: string;
   status: string;
   status_detail: string;
   currency_id: string;
@@ -19,6 +20,7 @@ export interface MPPayment {
   net_received_amount: number;
   total_paid_amount: number;
   installments: number;
+  collector_id: number;
   payer: {
     id: number;
     email: string;
@@ -121,5 +123,15 @@ export class MercadoPagoService {
     const dateFrom = new Date();
     dateFrom.setDate(dateFrom.getDate() - days);
     return this.getPayments({ dateFrom });
+  }
+
+  async getCurrentUserId(): Promise<number | null> {
+    try {
+      const response = await this.client.get<{ id: number }>('/v1/users/me');
+      return response.data.id;
+    } catch (err) {
+      logger.warn({ err }, 'Could not fetch MP user ID, income detection disabled');
+      return null;
+    }
   }
 }

@@ -40,12 +40,15 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       year: z.coerce.number().int().min(2020).max(2099).optional(),
       sortBy: z.enum(['date', 'amount']).default('date'),
       sortOrder: z.enum(['asc', 'desc']).default('desc'),
+      type: z.enum(['all', 'expense', 'income']).default('all'),
     });
 
-    const { page, limit, category, status, month, year, sortBy, sortOrder } = querySchema.parse(req.query);
+    const { page, limit, category, status, month, year, sortBy, sortOrder, type } = querySchema.parse(req.query);
 
     const where: Record<string, unknown> = {};
     if (status) where['status'] = status;
+    if (type === 'expense') where['isIncome'] = false;
+    if (type === 'income') where['isIncome'] = true;
 
     if (year && month) {
       where['date'] = {

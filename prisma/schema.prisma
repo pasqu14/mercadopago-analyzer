@@ -20,6 +20,7 @@ model Payment {
   paymentMethod String?  @map("payment_method")
   paymentType   String?  @map("payment_type")
   installments  Int      @default(1)
+  isIncome      Boolean  @default(false) @map("is_income")
   rawData       Json?    @map("raw_data")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
