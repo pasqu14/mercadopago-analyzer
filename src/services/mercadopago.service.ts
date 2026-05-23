@@ -127,7 +127,7 @@ export class MercadoPagoService {
 
   async getCurrentUserId(): Promise<number | null> {
     try {
-      const response = await this.client.get<{ id: number }>('/v1/users/me');
+      const response = await this.client.get<{ id: number }>('/users/me');
       return response.data.id;
     } catch (err) {
       logger.warn({ err }, 'Could not fetch MP user ID, income detection disabled');
