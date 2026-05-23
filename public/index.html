@@ -194,6 +194,8 @@
           <option>Suscripciones</option>
           <option>Salud</option>
           <option>Ropa</option>
+          <option>Transferencias</option>
+          <option>Cuotas</option>
           <option>Otros</option>
         </select>
       </div>
@@ -202,12 +204,12 @@
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-gray-100">
-            <th class="text-left py-2 px-3 text-gray-500 font-medium">Fecha</th>
+            <th class="text-left py-2 px-3 text-gray-500 font-medium cursor-pointer hover:text-gray-700 select-none" onclick="toggleSort('date')">Fecha<span id="sort-date" class="text-xs"></span></th>
             <th class="text-left py-2 px-3 text-gray-500 font-medium">Comercio</th>
             <th class="text-left py-2 px-3 text-gray-500 font-medium">Categoría</th>
             <th class="text-left py-2 px-3 text-gray-500 font-medium">Método</th>
             <th class="text-left py-2 px-3 text-gray-500 font-medium">Cuotas</th>
-            <th class="text-right py-2 px-3 text-gray-500 font-medium">Monto</th>
+            <th class="text-right py-2 px-3 text-gray-500 font-medium cursor-pointer hover:text-gray-700 select-none" onclick="toggleSort('amount')">Monto<span id="sort-amount" class="text-xs"></span></th>
           </tr>
         </thead>
         <tbody id="payments-table" class="divide-y divide-gray-50">
@@ -226,6 +228,8 @@ const state = {
   year: new Date().getFullYear(),
   month: new Date().getMonth() + 1,
   page: 1,
+  sortBy: 'date',
+  sortOrder: 'desc',
   pieChart: null,
   lineChart: null,
 };
@@ -238,6 +242,8 @@ const CATEGORY_COLORS = {
   'Suscripciones': '#ec4899',
   'Salud': '#ef4444',
   'Ropa': '#f97316',
+  'Transferencias': '#06b6d4',
+  'Cuotas': '#dc2626',
   'Otros': '#94a3b8',
 };
 
@@ -289,12 +295,36 @@ async function loadTransactions() {
     limit: 15,
     year: state.year,
     month: state.month,
+    sortBy: state.sortBy,
+    sortOrder: state.sortOrder,
     ...(category ? { category } : {}),
   });
 
   const data = await fetch(`/api/expenses?${params}`).then(r => r.json());
   renderTable(data.data);
   renderPagination(data.pagination);
+  updateSortHeaders();
+}
+
+function toggleSort(field) {
+  if (state.sortBy === field) {
+    state.sortOrder = state.sortOrder === 'desc' ? 'asc' : 'desc';
+  } else {
+    state.sortBy = field;
+    state.sortOrder = 'desc';
+  }
+  state.page = 1;
+  loadTransactions();
+}
+
+function updateSortHeaders() {
+  ['date', 'amount'].forEach(field => {
+    const el = document.getElementById(`sort-${field}`);
+    if (!el) return;
+    const isActive = state.sortBy === field;
+    el.textContent = isActive ? (state.sortOrder === 'desc' ? ' ↓' : ' ↑') : ' ↕';
+    el.style.color = isActive ? '#3b82f6' : '#94a3b8';
+  });
 }
 
 // ── Stats ──────────────────────────────────────────────
@@ -417,7 +447,7 @@ function renderTable(payments) {
         <td class="py-3 px-3 font-medium text-gray-900">${p.merchantName || p.description || '—'}</td>
         <td class="py-3 px-3">
           <select onchange="updateCategory('${p.id}', this.value)" class="text-xs border-0 bg-transparent focus:outline-none cursor-pointer" style="color:${color}">
-            ${['Alimentación','Transporte','Entretenimiento','Servicios','Suscripciones','Salud','Ropa','Otros'].map(c =>
+            ${['Alimentación','Transporte','Entretenimiento','Servicios','Suscripciones','Salud','Ropa','Transferencias','Cuotas','Otros'].map(c =>
               `<option value="${c}" ${c === catName ? 'selected' : ''}>${c}</option>`
             ).join('')}
           </select>

@@ -38,9 +38,11 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       status: z.string().optional(),
       month: z.coerce.number().int().min(1).max(12).optional(),
       year: z.coerce.number().int().min(2020).max(2099).optional(),
+      sortBy: z.enum(['date', 'amount']).default('date'),
+      sortOrder: z.enum(['asc', 'desc']).default('desc'),
     });
 
-    const { page, limit, category, status, month, year } = querySchema.parse(req.query);
+    const { page, limit, category, status, month, year, sortBy, sortOrder } = querySchema.parse(req.query);
 
     const where: Record<string, unknown> = {};
     if (status) where['status'] = status;
@@ -61,7 +63,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       prisma.payment.findMany({
         where,
         include: { category: true },
-        orderBy: { date: 'desc' },
+        orderBy: sortBy === 'amount' ? { amount: sortOrder } : { date: sortOrder },
         skip: (page - 1) * limit,
         take: limit,
       }),
